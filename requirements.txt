@@ -1,6 +1,6 @@
 streamlit
 pandas
-scikit-learn
 numpy
-pickle-mixin
-```}
+scikit-learn
+matplotlib
+seaborn
