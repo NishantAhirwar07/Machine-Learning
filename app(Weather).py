@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import pickle
 from datetime import datetime, timedelta
-import pytz
 
 st.set_page_config(page_title='Weather Forecast ML MODEL', page_icon='☁️', layout='centered')
 
@@ -77,13 +76,6 @@ sunrise = '5:53 am'
 sunset = '6:13 pm'
 
 # ---------- UI ----------
-india = pytz.timezone("Asia/Kolkata")
-now = datetime.now(india)
-
-st.markdown(
-    f"<div class='dim'>{now.strftime('%A, %d %B %Y | %I:%M %p')}</div>",
-    unsafe_allow_html=True
-)
 st.markdown('<div class="main-card">', unsafe_allow_html=True)
 st.markdown(f"<div class='dim'>{now.strftime('%A, %H:%M')}</div>", unsafe_allow_html=True)
 st.markdown(f"<div class='big'>{emoji} {condition} {temp}°C</div>", unsafe_allow_html=True)
