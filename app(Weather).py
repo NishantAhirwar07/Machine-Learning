@@ -2,8 +2,9 @@ import streamlit as st
 import pandas as pd
 import pickle
 from datetime import datetime, timedelta
+import pytz
 
-st.set_page_config(page_title='Weather Forecast ML', page_icon='☁️', layout='centered')
+st.set_page_config(page_title='Weather Forecast ML MODEL', page_icon='☁️', layout='centered')
 
 # ---------- LOAD MODEL ----------
 @st.cache_resource
@@ -72,10 +73,17 @@ condition = 'Rainy' if pred == 1 else ('Cloudy' if cloud > 55 else 'Sunny')
 emoji = '🌧️' if pred == 1 else ('☁️' if cloud > 55 else '☀️')
 temp = round((dewpoint + (100-humidity)/8),1)
 now = datetime.now()
-sunrise = '4:53 am'
-sunset = '8:13 pm'
+sunrise = '5:53 am'
+sunset = '6:13 pm'
 
 # ---------- UI ----------
+india = pytz.timezone("Asia/Kolkata")
+now = datetime.now(india)
+
+st.markdown(
+    f"<div class='dim'>{now.strftime('%A, %d %B %Y | %I:%M %p')}</div>",
+    unsafe_allow_html=True
+)
 st.markdown('<div class="main-card">', unsafe_allow_html=True)
 st.markdown(f"<div class='dim'>{now.strftime('%A, %H:%M')}</div>", unsafe_allow_html=True)
 st.markdown(f"<div class='big'>{emoji} {condition} {temp}°C</div>", unsafe_allow_html=True)
@@ -85,7 +93,7 @@ c1,c2,c3 = st.columns(3)
 with c1:
     st.markdown(f"<div class='metric-pill'>🌅 {sunrise}</div>", unsafe_allow_html=True)
 with c2:
-    st.markdown(f"<div class='metric-pill'>☀️ 15 h 32 m</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='metric-pill'>☀️ 12 h 20 m</div>", unsafe_allow_html=True)
 with c3:
     st.markdown(f"<div class='metric-pill'>🌇 {sunset}</div>", unsafe_allow_html=True)
 
@@ -108,4 +116,4 @@ for i,col in enumerate(cols):
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-st.caption('Deploy on Streamlit Cloud by uploading app.py and rainfall_prediction_model.pkl')
+st.caption('')
