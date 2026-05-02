@@ -4,6 +4,7 @@ import pickle
 from datetime import datetime, timedelta
 
 st.set_page_config(page_title='Weather Forecast ML MODEL', page_icon='☁️', layout='centered')
+st.title("🌦️ Weather Forecast App")
 
 # ---------- LOAD MODEL ----------
 @st.cache_resource
@@ -77,7 +78,7 @@ sunset = '6:13 pm'
 
 # ---------- UI ----------
 st.markdown('<div class="main-card">', unsafe_allow_html=True)
-st.markdown(f"<div class='dim'>{now.strftime('%A, %H:%M')}</div>", unsafe_allow_html=True)
+st.markdown(f"<div class='dim'>{now.strftime('%A')}</div>", unsafe_allow_html=True)
 st.markdown(f"<div class='big'>{emoji} {condition} {temp}°C</div>", unsafe_allow_html=True)
 st.markdown(f"<div class='mid'>{city}</div>", unsafe_allow_html=True)
 
