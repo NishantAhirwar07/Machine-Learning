@@ -1,280 +1,111 @@
-import sys
+import streamlit as st
 import pandas as pd
 import pickle
-import os
-import math
-import random
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox, QDoubleSpinBox, QPushButton, QFrame
-from PyQt5.QtCore import Qt, QTimer, QPoint, pyqtSignal
-from PyQt5.QtGui import QPainter, QColor, QPalette, QFont, QBrush, QPen, QLinearGradient
-from PyQt5.QtCore import QRect
+from datetime import datetime, timedelta
 
-class RaindropParticle:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-        self.speed = random.uniform(3, 7)
-        self.length = random.uniform(10, 20)
+st.set_page_config(page_title='Weather Forecast ML', page_icon='☁️', layout='centered')
 
-class WeatherCanvas(QFrame):
-    def __init__(self):
-        super().__init__()
-        self.is_rainy = False
-        self.temperature = 25
-        self.raindrops = []
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.update)
-        self.timer.start(50)
-        
-    def set_weather(self, is_rainy, temperature):
-        self.is_rainy = is_rainy
-        self.temperature = temperature
-        if is_rainy and not self.raindrops:
-            self.create_raindrops()
-        elif not is_rainy:
-            self.raindrops = []
-    
-    def create_raindrops(self):
-        self.raindrops = [RaindropParticle(random.randint(0, self.width()), random.randint(-50, self.height())) for _ in range(60)]
-    
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        
-        # Draw background gradient based on weather
-        if self.is_rainy:
-            # Rainy day - dark blue with gray
-            gradient = QLinearGradient(0, 0, 0, self.height())
-            gradient.setColorAt(0, QColor(70, 100, 140))
-            gradient.setColorAt(1, QColor(100, 120, 160))
-        else:
-            # Sunny day - gradient from light blue to yellow-orange
-            gradient = QLinearGradient(0, 0, 0, self.height())
-            gradient.setColorAt(0, QColor(135, 206, 235))  # Sky blue
-            gradient.setColorAt(1, QColor(255, 200, 100))  # Sunset orange
-        
-        painter.fillRect(self.rect(), QBrush(gradient))
-        
-        # Draw sun for sunny weather
-        if not self.is_rainy:
-            sun_x = self.width() - 80
-            sun_y = 80
-            painter.setBrush(QColor(255, 220, 0))
-            painter.drawEllipse(sun_x, sun_y, 60, 60)
-            painter.setBrush(QColor(255, 240, 100))
-            painter.drawEllipse(sun_x + 5, sun_y + 5, 50, 50)
-        
-        # Draw raindrops for rainy weather
-        if self.is_rainy:
-            painter.setPen(QPen(QColor(100, 200, 255), 2))
-            for raindrop in self.raindrops:
-                painter.drawLine(int(raindrop.x), int(raindrop.y), 
-                               int(raindrop.x), int(raindrop.y + raindrop.length))
-                raindrop.y += raindrop.speed
-                
-                if raindrop.y > self.height():
-                    raindrop.y = -20
-                    raindrop.x = random.randint(0, self.width())
+# ---------- LOAD MODEL ----------
+@st.cache_resource
+def load_model():
+    with open('rainfall_prediction_model.pkl', 'rb') as f:
+        data = pickle.load(f)
+    return data['model'], data['feature_names']
 
-class WeatherForecastApp(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.model = None
-        self.feature_names = None
-        self.load_model()
-        self.init_ui()
-    
-    def load_model(self):
-        MODEL_FILE = 'rainfall_prediction_model.pkl'
-        if not os.path.exists(MODEL_FILE):
-            print(f"Warning: {MODEL_FILE} not found!")
-            return
-        
-        with open(MODEL_FILE, 'rb') as file:
-            model_data = pickle.load(file)
-        self.model = model_data['model']
-        self.feature_names = model_data['feature_names']
-    
-    def init_ui(self):
-        self.setWindowTitle('🌦️ Weather Forecasting Model')
-        self.setGeometry(100, 100, 900, 700)
-        
-        # Main widget
-        main_widget = QWidget()
-        self.setCentralWidget(main_widget)
-        
-        # Main layout
-        main_layout = QHBoxLayout()
-        
-        # Left side - Canvas
-        left_widget = QWidget()
-        left_layout = QVBoxLayout()
-        
-        # Weather display canvas
-        self.canvas = WeatherCanvas()
-        self.canvas.setMinimumSize(400, 500)
-        left_layout.addWidget(self.canvas)
-        
-        # Temperature display
-        temp_label = QLabel()
-        temp_label.setFont(QFont('Arial', 24, QFont.Bold))
-        temp_label.setAlignment(Qt.AlignCenter)
-        temp_label.setText('Temperature: 25°C')
-        self.temp_label = temp_label
-        left_layout.addWidget(temp_label)
-        
-        # Prediction result
-        result_label = QLabel()
-        result_label.setFont(QFont('Arial', 16, QFont.Bold))
-        result_label.setAlignment(Qt.AlignCenter)
-        result_label.setText('Ready to predict...')
-        self.result_label = result_label
-        left_layout.addWidget(result_label)
-        
-        left_widget.setLayout(left_layout)
-        main_layout.addWidget(left_widget, 2)
-        
-        # Right side - Controls
-        right_widget = QWidget()
-        right_layout = QVBoxLayout()
-        
-        # Title
-        title = QLabel('Weather Inputs')
-        title.setFont(QFont('Arial', 16, QFont.Bold))
-        right_layout.addWidget(title)
-        
-        # Input fields
-        self.inputs = {}
-        defaults = {'Pressure': 1015.9, 'Dew Point': 19.9, 'Humidity': 95.0, 
-                   'Cloud': 81.0, 'Sunshine': 0.0, 'Wind Direction': 40.0, 'Wind Speed': 13.7}
-        
-        for label, default_value in defaults.items():
-            label_widget = QLabel(label)
-            label_widget.setFont(QFont('Arial', 10))
-            right_layout.addWidget(label_widget)
-            
-            spinbox = QDoubleSpinBox()
-            spinbox.setValue(default_value)
-            spinbox.setMaximum(10000)
-            spinbox.setMinimum(-10000)
-            spinbox.setDecimals(1)
-            self.inputs[label] = spinbox
-            right_layout.addWidget(spinbox)
-        
-        # Temperature slider (for demo)
-        right_layout.addSpacing(20)
-        temp_title = QLabel('Temperature (°C)')
-        temp_title.setFont(QFont('Arial', 10))
-        right_layout.addWidget(temp_title)
-        
-        temp_spinbox = QDoubleSpinBox()
-        temp_spinbox.setValue(25)
-        temp_spinbox.setMaximum(50)
-        temp_spinbox.setMinimum(-50)
-        temp_spinbox.setDecimals(1)
-        self.temp_input = temp_spinbox
-        right_layout.addWidget(temp_spinbox)
-        
-        right_layout.addSpacing(20)
-        
-        # Predict button
-        predict_btn = QPushButton('🔮 Predict Rainfall')
-        predict_btn.setFont(QFont('Arial', 12, QFont.Bold))
-        predict_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
-                color: white;
-                padding: 10px;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-        """)
-        predict_btn.clicked.connect(self.predict_rainfall)
-        right_layout.addWidget(predict_btn)
-        
-        # Reset button
-        reset_btn = QPushButton('🔄 Reset')
-        reset_btn.setFont(QFont('Arial', 10))
-        reset_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #2196F3;
-                color: white;
-                padding: 8px;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #0b7dda;
-            }
-        """)
-        reset_btn.clicked.connect(self.reset_values)
-        right_layout.addWidget(reset_btn)
-        
-        right_layout.addStretch()
-        right_widget.setLayout(right_layout)
-        right_widget.setMaximumWidth(300)
-        main_layout.addWidget(right_widget, 1)
-        
-        main_widget.setLayout(main_layout)
-        
-        # Apply stylesheet
-        self.setStyleSheet("""
-            QMainWindow {
-                background-color: #f5f5f5;
-            }
-            QLabel {
-                color: #333;
-            }
-            QDoubleSpinBox {
-                padding: 5px;
-                border: 1px solid #ddd;
-                border-radius: 3px;
-            }
-        """)
-    
-    def predict_rainfall(self):
-        if not self.model:
-            self.result_label.setText('❌ Model not loaded!')
-            return
-        
-        try:
-            # Collect input values
-            values = [self.inputs[label].value() for label in self.feature_names]
-            temperature = self.temp_input.value()
-            
-            # Predict
-            input_data = pd.DataFrame([values], columns=self.feature_names)
-            prediction = self.model.predict(input_data)[0]
-            
-            # Update canvas and display
-            is_rainy = prediction == 1
-            self.canvas.set_weather(is_rainy, temperature)
-            self.temp_label.setText(f'🌡️ Temperature: {temperature}°C')
-            
-            if is_rainy:
-                self.result_label.setText('🌧️ RAINFALL EXPECTED')
-                self.result_label.setStyleSheet('color: #0066cc; font-weight: bold;')
-            else:
-                self.result_label.setText('☀️ NO RAINFALL EXPECTED')
-                self.result_label.setStyleSheet('color: #ff9900; font-weight: bold;')
-        
-        except Exception as e:
-            self.result_label.setText(f'❌ Error: {str(e)}')
-    
-    def reset_values(self):
-        defaults = {'Pressure': 1015.9, 'Dew Point': 19.9, 'Humidity': 95.0, 
-                   'Cloud': 81.0, 'Sunshine': 0.0, 'Wind Direction': 40.0, 'Wind Speed': 13.7}
-        for label, value in defaults.items():
-            self.inputs[label].setValue(value)
-        self.temp_input.setValue(25)
-        self.canvas.set_weather(False, 25)
-        self.temp_label.setText('🌡️ Temperature: 25°C')
-        self.result_label.setText('Ready to predict...')
-        self.result_label.setStyleSheet('color: #333;')
+try:
+    model, feature_names = load_model()
+except Exception as e:
+    st.error(f'Model file not found or invalid: {e}')
+    st.stop()
 
-if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    weather_app = WeatherForecastApp()
-    weather_app.show()
-    sys.exit(app.exec_())
+# ---------- STYLE ----------
+st.markdown('''
+<style>
+.stApp {
+    background: linear-gradient(180deg,#5d6770,#1f2b34,#10151b);
+    background-attachment: fixed;
+}
+.main-card {
+    backdrop-filter: blur(18px);
+    background: rgba(255,255,255,0.14);
+    border: 1px solid rgba(255,255,255,0.22);
+    border-radius: 28px;
+    padding: 24px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+}
+.metric-pill {
+    background: rgba(7,30,40,.78);
+    padding: 12px 16px;
+    border-radius: 999px;
+    color: white;
+    text-align:center;
+}
+.small-card {
+    background: rgba(255,255,255,0.12);
+    padding: 10px;
+    border-radius: 18px;
+    text-align:center;
+}
+.big {font-size:34px;font-weight:700;color:white;}
+.mid {font-size:20px;color:white;}
+.dim {color:#dfe7ef;}
+label,p,h1,h2,h3,h4,h5,h6,div {color:white !important;}
+</style>
+''', unsafe_allow_html=True)
+
+# ---------- SIDEBAR INPUTS ----------
+st.sidebar.header('Weather Inputs')
+pressure = st.sidebar.slider('Pressure', 980.0, 1050.0, 1015.9)
+dewpoint = st.sidebar.slider('Dew Point', 0.0, 35.0, 19.9)
+humidity = st.sidebar.slider('Humidity', 0, 100, 73)
+cloud = st.sidebar.slider('Cloud Cover', 0, 100, 65)
+sunshine = st.sidebar.slider('Sunshine Hours', 0.0, 12.0, 4.0)
+winddirection = st.sidebar.slider('Wind Direction', 0.0, 360.0, 40.0)
+windspeed = st.sidebar.slider('Wind Speed', 0.0, 60.0, 10.0)
+city = st.sidebar.text_input('City', 'Kyiv, Ukraine')
+
+input_df = pd.DataFrame([[pressure, dewpoint, humidity, cloud, sunshine, winddirection, windspeed]], columns=feature_names)
+pred = model.predict(input_df)[0]
+prob = model.predict_proba(input_df)[0][1] if hasattr(model,'predict_proba') else 0.5
+
+condition = 'Rainy' if pred == 1 else ('Cloudy' if cloud > 55 else 'Sunny')
+emoji = '🌧️' if pred == 1 else ('☁️' if cloud > 55 else '☀️')
+temp = round((dewpoint + (100-humidity)/8),1)
+now = datetime.now()
+sunrise = '4:53 am'
+sunset = '8:13 pm'
+
+# ---------- UI ----------
+st.markdown('<div class="main-card">', unsafe_allow_html=True)
+st.markdown(f"<div class='dim'>{now.strftime('%A, %H:%M')}</div>", unsafe_allow_html=True)
+st.markdown(f"<div class='big'>{emoji} {condition} {temp}°C</div>", unsafe_allow_html=True)
+st.markdown(f"<div class='mid'>{city}</div>", unsafe_allow_html=True)
+
+c1,c2,c3 = st.columns(3)
+with c1:
+    st.markdown(f"<div class='metric-pill'>🌅 {sunrise}</div>", unsafe_allow_html=True)
+with c2:
+    st.markdown(f"<div class='metric-pill'>☀️ 15 h 32 m</div>", unsafe_allow_html=True)
+with c3:
+    st.markdown(f"<div class='metric-pill'>🌇 {sunset}</div>", unsafe_allow_html=True)
+
+st.markdown('<br>', unsafe_allow_html=True)
+st.markdown(f"<div class='metric-pill'>☔ Rain chance: {int(prob*100)}%</div>", unsafe_allow_html=True)
+
+c4,c5 = st.columns(2)
+with c4:
+    st.write(f'**Humidity:** {humidity}%')
+with c5:
+    st.write(f'**Wind:** {windspeed} km/h')
+
+st.write('### 7-Day Forecast')
+cols = st.columns(7)
+icons = ['☁️','⛅','🌧️','☀️','☁️','🌧️','⛅']
+for i,col in enumerate(cols):
+    day = (now + timedelta(days=i)).strftime('%a')
+    with col:
+        st.markdown(f"<div class='small-card'><b>{day}</b><br>{icons[i]}<br>{temp+i%3:.0f}°<br>{max(temp-4,1):.0f}°</div>", unsafe_allow_html=True)
+
+st.markdown('</div>', unsafe_allow_html=True)
+
+st.caption('Deploy on Streamlit Cloud by uploading app.py and rainfall_prediction_model.pkl')
