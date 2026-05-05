@@ -25,14 +25,7 @@ st.markdown('''
     background: linear-gradient(180deg,#5d6770,#1f2b34,#10151b);
     background-attachment: fixed;
 }
-.main-card {
-    backdrop-filter: blur(18px);
-    background: rgba(255,255,255,0.14);
-    border: 1px solid rgba(255,255,255,0.22);
-    border-radius: 28px;
-    padding: 24px;
-    box-shadow: 0 12px 40px rgba(0,0,0,0.25);
-}
+
 .metric-pill {
     background: rgba(7,30,40,.78);
     padding: 12px 16px;
